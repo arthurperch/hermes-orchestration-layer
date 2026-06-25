@@ -22,9 +22,4 @@ ENV TRANSPORT=sse \
 
 EXPOSE 3000
 
-# Healthcheck hits the status tool path on the backend it proxies.
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD python -c "import os,httpx,sys; \
-  sys.exit(0 if httpx.get(os.getenv('SYNDRAX_API_ENDPOINT','http://localhost:8000')+'/v1/status', timeout=4).status_code==200 else 1)" || exit 1
-
 CMD ["python", "-m", "hermes_mcp_orchestration"]

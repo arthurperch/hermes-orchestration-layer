@@ -354,6 +354,12 @@ def profile_switch(req: ProfileRequest) -> dict[str, Any]:
     return {"active_profile": _active_profile, "applied": True}
 
 
+@app.get("/healthz")
+def healthz() -> dict[str, Any]:
+    """Unauthenticated liveness probe — used by Docker healthcheck and load balancers."""
+    return {"healthy": True, "version": "0.2.0"}
+
+
 @app.get("/v1/status", dependencies=[Depends(_require_auth)])
 def status() -> dict[str, Any]:
     """Health + current state. Good first call to confirm the connection works."""
