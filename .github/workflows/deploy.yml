@@ -36,3 +36,5 @@ jobs:
           railway up --service syndrax-mcp
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: 9ef27d68-6785-4ba3-b50d-5c8abd23bbc4
+          RAILWAY_SERVICE_ID: 0fd5ee41-98bc-490d-bc06-8b4d5ac7d66f
