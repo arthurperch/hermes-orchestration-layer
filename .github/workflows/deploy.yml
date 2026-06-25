@@ -30,18 +30,9 @@ jobs:
         run: docker build -t syndrax-mcp:${{ github.sha }} .
       # --- DEPLOY: pick ONE of the options below and add the secret ---
       # Railway (recommended — flat-rate, no surprise autoscale bills):
-      # - name: Deploy to Railway
-      #   run: |
-      #     npm i -g @railway/cli
-      #     railway up --service syndrax-mcp
-      #   env:
-      #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      #
-      # Vercel (frontend / serverless backend):
-      # - uses: amondnet/vercel-action@v25
-      #   with:
-      #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
-      #     vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-      #     vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-      - name: Done
-        run: echo "Image built. Uncomment a deploy step + add its secret to ship."
+      - name: Deploy to Railway
+        run: |
+          npm i -g @railway/cli
+          railway up --service syndrax-mcp
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
