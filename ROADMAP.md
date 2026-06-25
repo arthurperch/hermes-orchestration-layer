@@ -7,18 +7,24 @@ bars), open **`roadmap.html`**.
 > Status keys: ✅ done · ◐ in progress · ◯ queued · ⛔ blocked
 > Update the percentages as you go — this is a living tracker.
 
-**Overall:** `█░░░░░░░░░░░░░░░░░░░` 5% — specs complete, implementation starting.
+**Overall:** `███░░░░░░░░░░░░░░░░░` 15% — MCP server + backend built, pushed, tests green.
 
 ---
 
 ## 🟦 Stage 1 — Foundation & Planner
-`█████░░░░░░░░░░░░░░░` 25% · [full spec →](docs/phase-1-planner.md)
+`████████████░░░░░░░░` 60% · [full spec →](docs/phase-1-planner.md)
 
 The planner reads the architecture, scores complexity, and routes. Nothing works
 until this does.
 
 - ✅ Architecture schema + provider/key resolution written
 - ✅ `profiles.json` toggle (default / orchestration / openrouter_only)
+- ✅ `mcp-requirements.txt` installed — all deps confirmed present
+- ✅ `mcp-test.py` passes — 8/8 green (mock backend)
+- ✅ `orchestration_backend.py` built — FastAPI, all 5 endpoints (`/v1/plan`, `/v1/execute`, `/v1/benchmark`, `/v1/profile`, `/v1/status`), Gates A/B/C/D/H implemented, tier routing per `rules-and-gates.md`
+- ✅ `mcp-test.py` passes against real backend — 8/8 green (live localhost)
+- ✅ Repo pushed to github.com/arthurperch/hermes-orchestration-layer
+- ◐ `hermes_mcp_orchestration.py --dev` server check (orchestration_backend on localhost)
 - ◐ LiteLLM proxy stood up + keys in `.env` (`SECRETS_SETUP.md`)
 - ◯ Gate A — context sufficiency (planner asks human until satisfied)
 - ◯ Gate B — complexity scorer (GLM-5.2 emits 0–10 + logs it)

@@ -141,10 +141,16 @@
    status values: "done" | "prog" | "queued" | "blocked"
    ============================================================ */
 const STAGES = [
-  { num:"1", ac:"#22D3EE", title:"Foundation & Planner", sub:"Read architecture · score complexity · route", pct:25, link:"docs/phase-1-planner.md",
+  { num:"1", ac:"#22D3EE", title:"Foundation & Planner", sub:"Read architecture · score complexity · route", pct:60, link:"docs/phase-1-planner.md",
     tasks:[
       {t:"Architecture schema + key resolution written", s:"done"},
       {t:"profiles.json toggle (default / orchestration / openrouter)", s:"done"},
+      {t:"mcp-requirements.txt installed — all deps confirmed present", s:"done"},
+      {t:"mcp-test.py — 8/8 green (mock backend)", s:"done"},
+      {t:"orchestration_backend.py built — FastAPI, all 5 endpoints, Gates A/B/C/D/H", s:"done"},
+      {t:"mcp-test.py — 8/8 green (live backend on localhost)", s:"done"},
+      {t:"Repo pushed to github.com/arthurperch/hermes-orchestration-layer", s:"done"},
+      {t:"hermes_mcp_orchestration.py --dev → talks to orchestration_backend on localhost", s:"prog"},
       {t:"LiteLLM proxy up + keys in .env (SECRETS_SETUP.md)", s:"prog"},
       {t:"Gate A — context sufficiency (ask human until ready)", s:"queued"},
       {t:"Gate B — complexity scorer (GLM-5.2 emits 0–10)", s:"queued"},
