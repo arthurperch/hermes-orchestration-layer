@@ -49,10 +49,13 @@ TRANSPORT = os.getenv("TRANSPORT", "stdio")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 REQUEST_TIMEOUT = float(os.getenv("SYNDRAX_TIMEOUT", "30"))
 
+# Write log to /tmp when running non-root in a container (default /app is read-only)
+_LOG_FILE = os.getenv("MCP_LOG_FILE", "/tmp/mcp-server.log" if os.getenv("TRANSPORT") == "sse" else "mcp-server.log")
+
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
     format="[%(levelname)s] %(asctime)s | %(name)s | %(message)s",
-    handlers=[logging.FileHandler("mcp-server.log"), logging.StreamHandler(sys.stderr)],
+    handlers=[logging.FileHandler(_LOG_FILE), logging.StreamHandler(sys.stderr)],
 )
 log = logging.getLogger("hermes-mcp-orchestration")
 
