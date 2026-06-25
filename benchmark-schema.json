@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hermes Benchmark Record",
+  "description": "One record per orchestrated task. This is the fuel for the Tier-0 self-tuning loop. Log everything; unlogged decisions cannot be tuned.",
+  "type": "object",
+  "required": ["task_id", "timestamp", "task_type", "complexity_predicted", "models_used", "cost_usd", "quality_score", "outcome"],
+  "properties": {
+    "task_id": { "type": "string", "description": "unique id" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "task_type": { "type": "string", "description": "from skill-definitions task_types" },
+    "task_summary": { "type": "string", "description": "one-line human description" },
+
+    "complexity_predicted": { "type": "integer", "minimum": 0, "maximum": 10, "description": "Planner's score at routing time" },
+    "complexity_actual": { "type": "integer", "minimum": 0, "maximum": 10, "description": "post-hoc: what it turned out to need. The gap between predicted and actual is the key tuning signal." },
+
+    "models_used": {
+      "type": "array",
+      "description": "ordered, including any escalations/fallbacks",
+      "items": {
+        "type": "object",
+        "properties": {
+          "model": { "type": "string" },
+          "tier": { "type": "string", "enum": ["planner", "executor_simple", "executor_medium", "executor_hard", "micro_orchestrator", "verifier", "architect", "failover"] },
+          "tokens_in": { "type": "integer" },
+          "tokens_out": { "type": "integer" },
+          "latency_ms": { "type": "integer" },
+          "succeeded": { "type": "boolean" }
+        }
+      }
+    },
+
+    "cost_usd": { "type": "number", "description": "total across all model calls for this task" },
+    "latency_ms_total": { "type": "integer" },
+
+    "escalations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "gate": { "type": "string", "enum": ["A", "B", "C", "D", "E", "F", "G", "H"] },
+          "from_tier": { "type": "string" },
+          "to_tier": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+
+    "retries": { "type": "integer", "description": "total executor retries (Gate E)" },
+    "fallbacks_triggered": { "type": "integer", "description": "provider chain hops due to outage/rate-limit" },
+    "human_touched": { "type": "boolean", "description": "did a human have to intervene (Gate H or otherwise)?" },
+    "collaborative_debug_used": { "type": "boolean" },
+
+    "compression_used": {
+      "type": "object",
+      "description": "per-layer record of whether compression ran. null/false where it didn't.",
+      "properties": {
+        "planner": { "type": "boolean" },
+        "executor": { "type": "boolean" },
+        "micro_orch": { "type": "boolean" },
+        "verifier": { "type": "boolean" },
+        "architect": { "type": "boolean" },
+        "handoff": { "type": "boolean" }
+      }
+    },
+    "compression_ratio": { "type": "number", "description": "compressed_tokens / original_tokens across compressed layers (lower = more squashed). 1.0 = no compression." },
+    "tokens_saved": { "type": "integer", "description": "original minus compressed tokens, net of the small-model call cost used to compress. Can be negative if compression cost more than it saved." },
+
+    "quality_score": {
+      "type": "number", "minimum": 0, "maximum": 1,
+      "description": "outcome quality. Define per task_type: e.g. for code = passed tests + lint + review; for data = % rows correct. See quality rubric in benchmark-template.md."
+    },
+    "quality_thresholds_met": { "type": "boolean", "description": "did it clear the minimum bar for this task_type?" },
+
+    "outcome": { "type": "string", "enum": ["success", "success_with_human", "degraded", "failed"] },
+    "feedback": {
+      "type": "object",
+      "description": "Upward feedback from a tier to the Architect. Populated only when something was off (bottleneck, missing context, skill gap). This is what powers the self-teaching planner loop — see ROADMAP future phase. null/absent on clean runs.",
+      "properties": {
+        "from_tier": { "type": "string", "description": "which tier is reporting (e.g. executor_medium, verifier)" },
+        "bottleneck": { "type": "string", "description": "what slowed or blocked the work" },
+        "missing_context": { "type": "string", "description": "context the planner should have gathered up front but didn't" },
+        "skill_gap": { "type": "string", "description": "a capability the planner lacked (e.g. 'did not ask about dependency graph')" },
+        "suggestion": { "type": "string", "description": "concrete proposed skill/question to add to the planner" }
+      }
+    },
+    "notes": { "type": "string" }
+  },
+
+  "example": {
+    "task_id": "tsk_00219",
+    "timestamp": "2026-06-24T09:14:00Z",
+    "task_type": "code_refactor",
+    "task_summary": "split monolithic handler into modules",
+    "complexity_predicted": 5,
+    "complexity_actual": 7,
+    "models_used": [
+      { "model": "glm-5.2", "tier": "planner", "tokens_in": 1200, "tokens_out": 400, "latency_ms": 1800, "succeeded": true },
+      { "model": "claude-sonnet-4-6", "tier": "executor_medium", "tokens_in": 6000, "tokens_out": 3200, "latency_ms": 9000, "succeeded": false },
+      { "model": "gpt-5.4", "tier": "executor_hard", "tokens_in": 6500, "tokens_out": 2800, "latency_ms": 11000, "succeeded": true },
+      { "model": "deepseek-v3", "tier": "verifier", "tokens_in": 3000, "tokens_out": 200, "latency_ms": 2000, "succeeded": true }
+    ],
+    "cost_usd": 0.213,
+    "latency_ms_total": 23800,
+    "escalations": [
+      { "gate": "G", "from_tier": "executor_medium", "to_tier": "executor_hard", "reason": "Sonnet flagged low confidence on circular-import edge case; collaborative debug with GPT-5.4" }
+    ],
+    "retries": 1,
+    "fallbacks_triggered": 0,
+    "human_touched": false,
+    "collaborative_debug_used": true,
+    "compression_used": { "planner": true, "executor": false, "micro_orch": true, "verifier": false, "architect": false, "handoff": true },
+    "compression_ratio": 0.62,
+    "tokens_saved": 4100,
+    "quality_score": 0.94,
+    "quality_thresholds_met": true,
+    "outcome": "success",
+    "feedback": {
+      "from_tier": "executor_medium",
+      "bottleneck": "circular import only surfaced mid-refactor",
+      "missing_context": "module dependency graph was not provided up front",
+      "skill_gap": "planner did not ask about cross-module dependencies before routing",
+      "suggestion": "add planner question: 'are there cross-module/circular dependencies?' for refactor tasks"
+    },
+    "notes": "Complexity under-predicted by 2. Architect should consider bumping multi-file refactors toward the hard tier by default."
+  }
+}

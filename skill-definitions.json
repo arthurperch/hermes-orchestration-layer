@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "purpose": "Defines what each agent/role is good at, mapped to task types. The Planner uses this to route; the Architect uses it to re-tune assignments as benchmarks reveal real strengths.",
+  "version": "0.1.0",
+
+  "task_types": [
+    "code_generation",
+    "code_refactor",
+    "debugging",
+    "architecture_design",
+    "data_transformation",
+    "api_integration",
+    "infrastructure_provisioning",
+    "spreadsheet_modeling",
+    "document_generation",
+    "automation_scripting",
+    "error_routing",
+    "validation_review",
+    "complexity_assessment",
+    "planning_decomposition"
+  ],
+
+  "roles": {
+    "planner": {
+      "core_skills": [
+        "planning_decomposition",
+        "complexity_assessment",
+        "clarifying_dialogue_with_human",
+        "emitting_machine_readable_plans"
+      ],
+      "must_be_good_at": "reading an ambiguous request, knowing what it does NOT know, and asking the right question before committing",
+      "good_task_types": ["planning_decomposition", "complexity_assessment", "error_routing"],
+      "weak_at": ["heavy code execution (delegate it)", "long-running generation"],
+      "learned_questions": [],
+      "_learned_questions_doc": "Grows over time via the self-teaching loop (synthesize_skills in self-tuning-logic.py). Recurring 'skill_gap' feedback from tiers becomes a question the planner asks up front. Dead entries are pruned. The planner's system prompt is regenerated from this list.",
+      "assigned_models": ["glm-5.2", "deepseek-v4-flash", "claude-haiku-4-5"]
+    },
+
+    "executor_simple": {
+      "core_skills": ["code_generation", "data_transformation", "automation_scripting"],
+      "must_be_good_at": "fast, dense output on well-specified, low-blast-radius tasks",
+      "good_task_types": ["code_generation", "data_transformation", "automation_scripting"],
+      "weak_at": ["ambiguity", "architecture_design", "high-stakes judgment"],
+      "assigned_models": ["deepseek-v3", "gemini-3-flash", "gemini-3.1-flash-lite"]
+    },
+
+    "executor_medium": {
+      "core_skills": ["code_generation", "code_refactor", "api_integration", "document_generation"],
+      "must_be_good_at": "production-quality, maintainable output with careful instruction-following",
+      "good_task_types": ["code_refactor", "api_integration", "spreadsheet_modeling", "document_generation"],
+      "weak_at": ["frontier-novel problems (escalate)"],
+      "assigned_models": ["claude-sonnet-4-6", "glm-5.2"]
+    },
+
+    "executor_hard": {
+      "core_skills": ["architecture_design", "debugging", "complexity_assessment"],
+      "must_be_good_at": "multi-step reasoning, high-blast-radius decisions, long-context coherence",
+      "good_task_types": ["architecture_design", "debugging", "infrastructure_provisioning"],
+      "collaboration": "may pair with a second hard model on a stuck blocker (Gate G)",
+      "assigned_models": ["claude-opus-4-8", "gpt-5.4", "deepseek-v4-pro"]
+    },
+
+    "micro_orchestrator": {
+      "core_skills": ["error_routing", "complexity_assessment", "fast_local_decisions"],
+      "must_be_good_at": "deciding in one shot whether a failure is local-fixable or needs a re-plan, without looping",
+      "constraints": { "max_local_reroutes": 1, "max_planner_callbacks": 1 },
+      "assigned_models": ["claude-haiku-4-5", "glm-5.2"]
+    },
+
+    "verifier": {
+      "core_skills": ["validation_review", "debugging"],
+      "must_be_good_at": "catching what the generator missed; running objective checks and giving an honest second opinion",
+      "good_task_types": ["validation_review"],
+      "assigned_models": ["deepseek-v3", "claude-sonnet-4-6"]
+    },
+
+    "architect": {
+      "core_skills": ["planning_decomposition", "complexity_assessment", "system_self_evaluation"],
+      "must_be_good_at": "reading benchmark logs, finding where routing was wrong, proposing concrete threshold/rule changes, and justifying them",
+      "in_hot_path": false,
+      "assigned_models": ["claude-opus-4-8", "gpt-5.4"]
+    }
+  },
+
+  "task_type_routing": {
+    "code_generation":        { "default_role": "executor_simple",  "escalates_to": "executor_medium" },
+    "code_refactor":          { "default_role": "executor_medium",  "escalates_to": "executor_hard" },
+    "debugging":              { "default_role": "executor_medium",  "escalates_to": "executor_hard", "may_trigger": "collaborative_debug" },
+    "architecture_design":    { "default_role": "executor_hard",    "escalates_to": "human" },
+    "data_transformation":    { "default_role": "executor_simple",  "escalates_to": "executor_medium" },
+    "api_integration":        { "default_role": "executor_medium",  "escalates_to": "executor_hard" },
+    "infrastructure_provisioning": { "default_role": "executor_hard", "escalates_to": "human" },
+    "spreadsheet_modeling":   { "default_role": "executor_medium",  "escalates_to": "executor_hard" },
+    "document_generation":    { "default_role": "executor_simple",  "escalates_to": "executor_medium" },
+    "automation_scripting":   { "default_role": "executor_simple",  "escalates_to": "executor_medium" },
+    "error_routing":          { "default_role": "micro_orchestrator", "escalates_to": "planner" },
+    "validation_review":      { "default_role": "verifier",         "escalates_to": "executor_hard" },
+    "complexity_assessment":  { "default_role": "planner",          "escalates_to": "architect" },
+    "planning_decomposition": { "default_role": "planner",          "escalates_to": "architect" }
+  },
+
+  "skill_calibration_note": "These mappings are starting hypotheses. The benchmark loop measures actual success-rate-per-model-per-task-type. When the data contradicts an assignment (e.g. a 'simple' executor keeps failing data_transformation), the Architect proposes moving that task type to a higher tier or a different model. Skills are observed, not assumed."
+}

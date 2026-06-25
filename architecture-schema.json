@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "system": "hermes-orchestration-layer",
+  "version": "0.2.0",
+  "objective": {
+    "function": "minimize_cost_subject_to_quality_thresholds",
+    "description": "Cost is optimized only within per-task-type quality guardrails. A cheap wrong answer is more expensive than a costly correct one.",
+    "primary_metric": "quality_per_dollar",
+    "secondary_metrics": ["latency", "escalation_rate", "human_intervention_rate"]
+  },
+
+  "providers": {
+    "_doc": "How models resolve to credentials. Calls go through a self-hosted LiteLLM proxy (routing/fallback OFF — the Gates decide). LiteLLM holds direct provider keys; any model without a direct key falls through to OpenRouter. Full setup in SECRETS_SETUP.md, hierarchy in API_KEY_HIERARCHY.md. Keys are referenced by env-var NAME only — never store raw key values in this repo.",
+    "call_layer": "litellm-proxy (self-hosted on VPS)",
+    "failover_provider": "openrouter",
+    "key_env_by_provider": {
+      "anthropic": "ANTHROPIC_API_KEY",
+      "deepseek":  "DEEPSEEK_API_KEY",
+      "zai":       "ZAI_API_KEY",
+      "openai":    "OPENAI_API_KEY",
+      "google":    "GOOGLE_API_KEY",
+      "openrouter":"OPENROUTER_API_KEY"
+    },
+    "model_to_provider": {
+      "claude-opus-4-8":    "anthropic",
+      "claude-sonnet-4-6":  "anthropic",
+      "claude-haiku-4-5":   "anthropic",
+      "deepseek-v3":        "deepseek",
+      "deepseek-v4-flash":  "deepseek",
+      "deepseek-v4-pro":    "deepseek",
+      "glm-5.2":            "zai",
+      "gpt-5.4":            "openai",
+      "gemini-3-flash":     "google",
+      "gemini-3.1-flash-lite": "google"
+    },
+    "resolution_rule": "For any model: look up its provider -> look up that provider's key_env -> read the key from the environment / Secrets Manager at runtime. If the provider key is unset OR the direct call fails/rate-limits, LiteLLM routes the same request via OPENROUTER_API_KEY."
+  },
+
+  "tiers": {
+    "tier_0_architect": {
+      "role": "Build Architect / Manager",
+      "purpose": "Builds and periodically re-tunes the orchestration system from benchmark data. NOT in the request hot path.",
+      "in_hot_path": false,
+      "runs": "on-demand or scheduled (e.g. nightly review of benchmark logs)",
+      "responsibilities": [
+        "Read benchmark logs (predicted vs actual complexity, cost, quality)",
+        "Detect routing rules that consistently under/over-shoot",
+        "Propose rule + threshold changes",
+        "Sandbox-test proposed changes before promotion",
+        "Update rules-and-gates and model-tier-matrix via PR"
+      ],
+      "models": {
+        "primary": "claude-opus-4-8",
+        "fallback": ["gpt-5.4", "deepseek-v4-pro"]
+      }
+    },
+
+    "tier_1_planner": {
+      "role": "Planner / Meta-Orchestrator",
+      "purpose": "Front line. Reads the task, runs clarifying Q&A with the human until context is sufficient, scores complexity, emits a routing plan.",
+      "in_hot_path": true,
+      "responsibilities": [
+        "Context-sufficiency check (Gate A)",
+        "Complexity scoring 0-10 (Gate B)",
+        "Emit machine-readable routing plan",
+        "Log plan + reasoning for audit",
+        "Receive callbacks from micro-orchestrators and re-plan"
+      ],
+      "outputs": {
+        "complexity_score": "integer 0-10",
+        "plan": "ordered list of {executor, task_slice, validation_required}",
+        "reasoning": "string (logged, not shown unless requested)"
+      },
+      "models": {
+        "primary": "glm-5.2",
+        "fallback": ["deepseek-v4-flash", "claude-haiku-4-5"]
+      }
+    },
+
+    "tier_2_executors": {
+      "role": "Executors / Workers",
+      "purpose": "Do the actual work. Selected by complexity score.",
+      "in_hot_path": true,
+      "routing_by_complexity": {
+        "0-3_simple": {
+          "models": ["deepseek-v3", "gemini-3-flash"],
+          "validation": "light (lint/type-check only)"
+        },
+        "4-6_medium": {
+          "models": ["claude-sonnet-4-6", "glm-5.2"],
+          "validation": "standard (lint + confidence gate)"
+        },
+        "7-10_hard": {
+          "models": ["claude-opus-4-8", "gpt-5.4"],
+          "collaboration": "enabled (cross-model debug on stuck)",
+          "validation": "strict (second-model review + human gate)"
+        }
+      }
+    },
+
+    "tier_2_5_micro_orchestrator": {
+      "role": "Micro-Orchestrator",
+      "purpose": "Sits beside each executor. On failure, makes ONE fast local decision: reroute to a sibling fixer, or escalate back to the planner. Hard-capped communications to prevent loops.",
+      "in_hot_path": true,
+      "activates_on": "executor failure, confidence drop, or lint/type failure",
+      "max_local_reroutes": 1,
+      "max_planner_callbacks": 1,
+      "decision": {
+        "local_fix": "route error to one cheaper fixer for a single shot",
+        "callback": "report 'complexity underestimated, actual N/10' to planner for re-plan"
+      },
+      "models": {
+        "primary": "claude-haiku-4-5",
+        "fallback": ["glm-5.2"]
+      }
+    },
+
+    "tier_3_verifier": {
+      "role": "Verifier",
+      "purpose": "Validates executor output before it is committed downstream.",
+      "in_hot_path": true,
+      "checks": [
+        "objective: linter, type-checker, test run",
+        "self-reported: model confidence / caveats (Gate C)",
+        "second-opinion: independent model review for high-stakes tasks (Gate H)"
+      ],
+      "models": {
+        "primary": "deepseek-v3",
+        "fallback": ["claude-sonnet-4-6"]
+      }
+    },
+
+    "tier_failover": {
+      "role": "Failover",
+      "purpose": "Catch-all when a primary provider is rate-limited or down. Accepts higher cost only because primaries are unavailable.",
+      "in_hot_path": false,
+      "trigger": "primary + secondary for a tier both unavailable",
+      "provider": "openrouter",
+      "note": "Never the default. Cost penalty is the reason it is last."
+    }
+  },
+
+  "fallback_chains": {
+    "planner": ["glm-5.2", "deepseek-v4-flash", "claude-haiku-4-5", "openrouter:*"],
+    "executor_simple": ["deepseek-v3", "gemini-3-flash", "openrouter:*"],
+    "executor_medium": ["claude-sonnet-4-6", "glm-5.2", "gpt-5.4", "openrouter:*"],
+    "executor_hard": ["claude-opus-4-8", "gpt-5.4", "deepseek-v4-pro", "openrouter:*"],
+    "verifier": ["deepseek-v3", "claude-sonnet-4-6", "openrouter:*"]
+  },
+
+  "failure_modes": {
+    "timeout": {
+      "strategy": "retry once with shorter context, then advance to next in chain",
+      "do_not": "retry same model indefinitely"
+    },
+    "rate_limit": {
+      "strategy": "skip immediately to next provider in chain",
+      "do_not": "back off and retry same provider in hot path"
+    },
+    "invalid_response": {
+      "strategy": "one reformulation attempt, then escalate one tier",
+      "examples": ["malformed JSON", "empty output", "refusal on benign task"]
+    },
+    "crash_or_5xx": {
+      "strategy": "advance to next provider in chain, log incident",
+      "note": "provider crashes (e.g. GLM/DeepSeek peak-hour outages) are why chains bounce between independent providers"
+    }
+  },
+
+  "gates": {
+    "A": "context_sufficiency",
+    "B": "complexity_to_tier",
+    "C": "output_confidence",
+    "D": "error_detection",
+    "E": "retry_budget",
+    "F": "output_sanity",
+    "G": "collaborative_debug_trigger",
+    "H": "human_in_loop"
+  },
+
+  "compression": {
+    "description": "Optional, per-layer context compression. Lossy by nature at some layers, so the toggle is stakes-aware, not a dumb on/off. Full rationale and rules in compression-rules.md.",
+    "enabled": true,
+    "default_mode": "lossless",
+    "min_tokens_to_compress": 2000,
+    "stakes_override": true,
+    "_stakes_override_note": "When a task is high-stakes (Gate H), force compression OFF at executor and verifier regardless of layer toggles below.",
+    "layers": {
+      "planner":    { "enabled": true,  "mode": "lossy",    "note": "squash clarifying Q&A into a tight spec before planning" },
+      "executor":   { "enabled": true,  "mode": "lossless", "note": "dedup + snippet/summary + diff-only; never drop substance" },
+      "micro_orch": { "enabled": true,  "mode": "lossy",    "note": "distill a failure to 'what broke + why'" },
+      "verifier":   { "enabled": false, "mode": "off",      "note": "needs full fidelity to check correctness; default OFF" },
+      "architect":  { "enabled": true,  "mode": "lossy",    "note": "feed aggregates, not raw logs" },
+      "handoff":    { "enabled": true,  "mode": "lossless", "note": "inter-agent payloads: IDs + summaries, no whole files" }
+    },
+    "modes": {
+      "lossless": "safe transforms only: dedup, strip boilerplate, reference-by-ID, diff instead of whole file. Reversible-ish, no meaning dropped.",
+      "lossy": "summarization / distillation by a small model. Drops detail. Opt-in per layer, never the global default.",
+      "off": "pass context through untouched."
+    },
+    "cost_note": "Lossy compression usually costs an extra small-model call. Net win only when downstream token savings beat that call cost, hence min_tokens_to_compress. Benchmarked like any other rule; the Architect auto-disables compression at any layer where it drops quality_pass_rate for a task type."
+  },
+
+  "logging": {
+    "per_request": ["task_id", "complexity_predicted", "models_used", "tokens_in", "tokens_out", "cost_usd", "quality_score", "latency_ms", "escalations", "human_touched", "compression_used", "compression_ratio", "tokens_saved"],
+    "destination": "benchmark log (see benchmark-schema.json)",
+    "purpose": "fuel for tier_0_architect self-tuning loop"
+  }
+}

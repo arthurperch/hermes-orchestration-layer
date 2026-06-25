@@ -1,0 +1,54 @@
+{
+  "_doc": "Runtime profiles. Hermes reads this at the top of each cycle (git pull -> load active_profile). Flip 'active_profile' to switch the whole system between bare Hermes and full orchestration. Edit in GitHub web UI or via the controlplane dashboard; both machines pick up the change on next cycle. Models reference providers in architecture-schema.json; keys resolve via .env / Secrets Manager (never stored here).",
+  "active_profile": "orchestration",
+
+  "profiles": {
+    "default": {
+      "description": "Bare Hermes. Single model, no tiers, no gates, no benchmark logging. Fast and cheap for trivial work or when you just want a straight agent loop.",
+      "orchestration_enabled": false,
+      "model": "claude-haiku-4-5",
+      "fallback": ["glm-5.2", "openrouter-any"],
+      "benchmark_logging": false,
+      "compression_enabled": false
+    },
+
+    "orchestration": {
+      "description": "Full tier system: planner complexity scoring, gates A-H, micro-orchestrator, verifier, benchmark logging, and the Architect self-tuning loop.",
+      "orchestration_enabled": true,
+      "call_layer": "litellm-proxy",
+      "tiers": {
+        "planner":         { "chain": ["glm-5.2", "deepseek-v4-flash", "claude-haiku-4-5", "openrouter-any"] },
+        "executor_simple": { "chain": ["deepseek-v3", "gemini-3-flash", "openrouter-any"] },
+        "executor_medium": { "chain": ["claude-sonnet-4-6", "glm-5.2", "openrouter-any"] },
+        "executor_hard":   { "chain": ["claude-opus-4-8", "gpt-5.4", "deepseek-v4-pro", "openrouter-any"] },
+        "micro_orch":      { "chain": ["claude-haiku-4-5", "glm-5.2", "openrouter-any"] },
+        "verifier":        { "chain": ["deepseek-v3", "claude-sonnet-4-6", "openrouter-any"] },
+        "architect":       { "chain": ["claude-opus-4-8", "gpt-5.4", "openrouter-any"] }
+      },
+      "gates": "rules-and-gates.md",
+      "compression": "architecture-schema.json#/compression",
+      "benchmark_logging": true,
+      "benchmark_log_path": "benchmark_logs/",
+      "compression_enabled": false,
+      "_compression_note": "Leave OFF until baseline numbers exist; enable one layer at a time per benchmark-template.md A/B protocol."
+    },
+
+    "openrouter_only": {
+      "description": "Cheap-to-stand-up testing profile. Everything routes through OpenRouter (one key). Higher per-token cost, but zero direct-key setup — use it to get the pipeline working, then swap to the 'orchestration' profile as you add direct keys.",
+      "orchestration_enabled": true,
+      "call_layer": "litellm-proxy",
+      "tiers": {
+        "planner":         { "chain": ["openrouter-any"] },
+        "executor_simple": { "chain": ["openrouter-any"] },
+        "executor_medium": { "chain": ["openrouter-any"] },
+        "executor_hard":   { "chain": ["openrouter-any"] },
+        "micro_orch":      { "chain": ["openrouter-any"] },
+        "verifier":        { "chain": ["openrouter-any"] },
+        "architect":       { "chain": ["openrouter-any"] }
+      },
+      "benchmark_logging": true,
+      "benchmark_log_path": "benchmark_logs/",
+      "compression_enabled": false
+    }
+  }
+}

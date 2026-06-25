@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Orchestration — Build Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0E16; --bg2:#0d1320; --panel:#121A26; --line:rgba(255,255,255,.08);
+    --txt:#E7EDF5; --muted:#8A97AB; --muted2:#5d6878;
+    --blocked:#F0556B;
+    --display:'Space Grotesk',sans-serif; --body:'Inter',sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:
+      radial-gradient(1200px 600px at 80% -10%, #14203400, #0A0E16 70%),
+      var(--bg);
+    color:var(--txt); font-family:var(--body); line-height:1.6;
+    -webkit-font-smoothing:antialiased; padding:0 0 120px;}
+
+  /* ---- console header ---- */
+  header.console{
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#0d1422,#0A0E16);
+    padding:38px clamp(20px,5vw,72px) 30px;
+    position:relative; overflow:hidden;
+  }
+  header.console::before{
+    content:""; position:absolute; inset:0;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:46px 46px; opacity:.25; -webkit-mask-image:linear-gradient(180deg,#000,transparent);mask-image:linear-gradient(180deg,#000,transparent);
+  }
+  .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);position:relative}
+  .callsign{color:#22D3EE}
+  h1{font-family:var(--display);font-weight:700;font-size:clamp(2rem,5vw,3.1rem);letter-spacing:-.02em;margin:.35em 0 .15em;position:relative}
+  .sub{color:var(--muted);max-width:60ch;position:relative;font-size:1.02rem}
+
+  /* ---- overall meter ---- */
+  .overall{margin-top:28px;position:relative;max-width:780px}
+  .overall .row{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+  .overall .pct{color:var(--txt);font-size:1.15rem;font-weight:700}
+  .bar{position:relative;height:16px;border-radius:9px;background:#0c1422;border:1px solid var(--line);overflow:hidden}
+  .bar .fill{position:absolute;inset:0 auto 0 0;border-radius:9px;
+    background:linear-gradient(90deg,#22D3EE,#60A5FA);
+    box-shadow:0 0 18px -2px #22d3ee88; transition:width .9s cubic-bezier(.2,.8,.2,1)}
+  .bar .ticks{position:absolute;inset:0;background-image:repeating-linear-gradient(90deg,transparent 0,transparent 30px,rgba(0,0,0,.35) 30px,rgba(0,0,0,.35) 31px)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:16px;font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .dot{width:9px;height:9px;border-radius:50%}
+
+  /* ---- stages ---- */
+  main{max-width:1080px;margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+  .stage{margin-top:30px;border:1px solid var(--line);border-left:4px solid var(--ac);
+    border-radius:16px;overflow:hidden;background:
+      linear-gradient(180deg, color-mix(in srgb, var(--ac) 9%, var(--panel)), var(--panel) 55%);
+  }
+  .stage-head{display:flex;align-items:center;gap:18px;padding:20px 26px;border-bottom:1px solid var(--line);
+    background:color-mix(in srgb, var(--ac) 14%, transparent)}
+  .stage-num{font-family:var(--mono);font-weight:700;font-size:1.05rem;color:#0A0E16;
+    background:var(--ac);min-width:46px;height:46px;display:grid;place-items:center;border-radius:11px;
+    box-shadow:0 0 22px -4px var(--ac)}
+  .stage-titlewrap{flex:1;min-width:0}
+  .stage-title{font-family:var(--display);font-weight:600;font-size:clamp(1.2rem,2.6vw,1.6rem);letter-spacing:-.01em;line-height:1.2}
+  .stage-sub{color:var(--muted);font-size:.95rem;margin-top:2px}
+  .stage-pct{font-family:var(--mono);font-weight:700;font-size:1.5rem;color:var(--ac);text-align:right}
+  .stage-pct small{display:block;font-size:.6rem;letter-spacing:.16em;color:var(--muted2);font-weight:500;text-transform:uppercase;margin-top:2px}
+
+  .stage-body{padding:18px 26px 24px}
+  /* main stage progress bar */
+  .mbar{position:relative;height:13px;border-radius:8px;background:#0c1422;border:1px solid var(--line);overflow:hidden;margin:4px 0 22px}
+  .mbar .mfill{position:absolute;inset:0 auto 0 0;border-radius:8px;background:var(--ac);box-shadow:0 0 16px -3px var(--ac);transition:width .9s cubic-bezier(.2,.8,.2,1)}
+  .mbar .ticks{position:absolute;inset:0;background-image:repeating-linear-gradient(90deg,transparent 0,transparent 26px,rgba(0,0,0,.4) 26px,rgba(0,0,0,.4) 27px)}
+
+  /* task rows */
+  .tasks{list-style:none;display:flex;flex-direction:column;gap:2px}
+  .task{display:flex;align-items:center;gap:14px;padding:11px 12px;border-radius:10px;color:var(--txt);text-decoration:none;transition:background .15s,transform .15s}
+  .task:hover{background:color-mix(in srgb,var(--ac) 10%,transparent);transform:translateX(3px)}
+  .task:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+  .chip{font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px;border-radius:6px;white-space:nowrap;flex-shrink:0;min-width:96px;text-align:center}
+  .chip.done{background:var(--ac);color:#0A0E16;font-weight:700}
+  .chip.prog{border:1px solid var(--ac);color:var(--ac);display:inline-flex;align-items:center;gap:6px;justify-content:center}
+  .chip.prog::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ac);animation:pulse 1.6s infinite}
+  .chip.queued{border:1px solid var(--muted2);color:var(--muted)}
+  .chip.blocked{border:1px solid var(--blocked);color:var(--blocked)}
+  .task .lbl{flex:1;font-size:1rem}
+  .task .arrow{color:var(--muted2);font-family:var(--mono);font-size:.85rem;opacity:0;transition:opacity .15s}
+  .task:hover .arrow{opacity:1}
+
+  .speclink{display:inline-flex;align-items:center;gap:8px;margin-top:18px;font-family:var(--mono);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ac);text-decoration:none;border:1px solid color-mix(in srgb,var(--ac) 40%,transparent);padding:9px 15px;border-radius:9px;transition:background .15s}
+  .speclink:hover{background:color-mix(in srgb,var(--ac) 14%,transparent)}
+
+  /* future stage — gradient accent */
+  .stage.future{--ac:#22D3EE;border-left:4px solid transparent;
+    border-image:linear-gradient(180deg,#22D3EE,#A78BFA) 1;}
+  .stage.future .stage-num{background:linear-gradient(135deg,#22D3EE,#A78BFA)}
+  .stage.future .stage-head{background:linear-gradient(90deg,#22d3ee22,#a78bfa22)}
+
+  footer{max-width:1080px;margin:46px auto 0;padding:24px clamp(16px,4vw,40px);border-top:1px solid var(--line);color:var(--muted2);font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-between}
+  footer a{color:var(--muted)}
+
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  @media (max-width:620px){
+    .stage-head{flex-wrap:wrap}.stage-pct{text-align:left}
+    .chip{min-width:auto}.task .lbl{font-size:.95rem}
+  }
+</style>
+</head>
+<body>
+<header class="console">
+  <div class="eyebrow"><span class="callsign">⚡ HERMES</span> · ORCHESTRATION LAYER · BUILD STATUS</div>
+  <h1>Build Status Console</h1>
+  <p class="sub">Live tracker for the multi-model orchestration build. Each stage is color-coded; tap any task to open its full spec. Update the percentages in the data block as the build moves.</p>
+
+  <div class="overall">
+    <div class="row"><span>Overall progress</span><span class="pct" id="ovPct">5%</span></div>
+    <div class="bar"><div class="fill" id="ovFill" style="width:5%"></div><div class="ticks"></div></div>
+    <div class="legend">
+      <span><i class="dot" style="background:#22D3EE"></i>Done</span>
+      <span><i class="dot" style="background:#A78BFA"></i>In progress</span>
+      <span><i class="dot" style="background:#5d6878"></i>Queued</span>
+      <span><i class="dot" style="background:#F0556B"></i>Blocked</span>
+    </div>
+  </div>
+</header>
+
+<main id="stages"></main>
+
+<footer>
+  <span>SYNDRAX · HERMES ORCHESTRATION LAYER</span>
+  <span>specs: <a href="README.md">README</a> · <a href="ROADMAP.md">ROADMAP.md</a> · <a href="architecture-schema.json">schema</a></span>
+</footer>
+
+<script>
+/* ============================================================
+   EDIT HERE as the build moves. Change `pct` and task `s` (status).
+   status values: "done" | "prog" | "queued" | "blocked"
+   ============================================================ */
+const STAGES = [
+  { num:"1", ac:"#22D3EE", title:"Foundation & Planner", sub:"Read architecture · score complexity · route", pct:25, link:"docs/phase-1-planner.md",
+    tasks:[
+      {t:"Architecture schema + key resolution written", s:"done"},
+      {t:"profiles.json toggle (default / orchestration / openrouter)", s:"done"},
+      {t:"LiteLLM proxy up + keys in .env (SECRETS_SETUP.md)", s:"prog"},
+      {t:"Gate A — context sufficiency (ask human until ready)", s:"queued"},
+      {t:"Gate B — complexity scorer (GLM-5.2 emits 0–10)", s:"queued"},
+      {t:"Fallback chain verified (GLM → DeepSeek → Haiku → OpenRouter)", s:"queued"},
+    ]},
+  { num:"2", ac:"#F5B544", title:"Benchmark Baseline", sub:"Measure before tuning anything", pct:0, link:"docs/phase-2-benchmark.md",
+    tasks:[
+      {t:"benchmark_logs/ writing one record per task", s:"queued"},
+      {t:"Run difficulty ladder: 20+ trivial / medium / hard", s:"queued"},
+      {t:"Run baseline strategies (cheap / strong / fixed / cascade)", s:"queued"},
+      {t:"Compute metrics: quality_per_dollar, pass_rate, error", s:"queued"},
+    ]},
+  { num:"3", ac:"#A78BFA", title:"Gates & Micro-Orchestrator", sub:"Confidence · errors · retries · escalation · human gate", pct:0, link:"docs/phase-3-gates.md",
+    tasks:[
+      {t:"Gates C / D / F (confidence, lint+type, sanity)", s:"queued"},
+      {t:"Gate E retry budget + micro-orchestrator (one fix or escalate)", s:"queued"},
+      {t:"Gate G collaborative debug (only when stuck)", s:"queued"},
+      {t:"Gate H human-in-the-loop on high-stakes", s:"queued"},
+      {t:"Re-run baseline under full orchestration → compare", s:"queued"},
+    ]},
+  { num:"4", ac:"#34D399", title:"Architect Self-Tuning", sub:"System rewrites its own routing from benchmarks", pct:0, link:"docs/phase-4-architect.md",
+    tasks:[
+      {t:"Feed logs to self-tuning-logic.py", s:"queued"},
+      {t:"Diagnose mis-routing, propose one change at a time", s:"queued"},
+      {t:"Sandbox-test on held-out set (hard quality floor)", s:"queued"},
+      {t:"Promote winning changes via PR", s:"queued"},
+    ]},
+  { num:"5", ac:"#FB7185", title:"Compression A/B", sub:"Token savings per layer — only where quality holds", pct:0, link:"docs/phase-5-compression.md",
+    tasks:[
+      {t:"Keep compression OFF; capture baseline first", s:"queued"},
+      {t:"A/B one layer at a time (start handoff, lossless)", s:"queued"},
+      {t:"Keep only where quality_delta ≥ 0 AND tokens_saved > 0", s:"queued"},
+    ]},
+  { num:"6", ac:"#60A5FA", title:"Shared Controlplane Dashboard", sub:"syndrax.app · glassy chat, plan console, live · both of you", pct:0, link:"docs/phase-6-dashboard.md",
+    tasks:[
+      {t:"Backend (Railway) — FastAPI + WebSocket live feed", s:"queued"},
+      {t:"Cloudflare Access login (same policy as Syndrax Sync)", s:"queued"},
+      {t:"Glassy chat + Plan Console (confirm/modify before run)", s:"queued"},
+      {t:"Profiles w/ per-profile memory + Repo cards (push/deploy)", s:"queued"},
+      {t:"Live Canvas — click DOM element → send to AI", s:"queued"},
+      {t:"Deploy on syndrax.app (Vercel) — see DASHBOARD_SPEC / DESIGN_SYSTEM", s:"queued"},
+    ]},
+  { num:"✦", ac:"#22D3EE", title:"Self-Teaching Planner Loop", sub:"Future · planner grows its own skills, prunes dead ones", pct:0, link:"docs/future-self-teaching-loop.md", future:true,
+    tasks:[
+      {t:"feedback fields in benchmark schema", s:"done"},
+      {t:"synthesize_skills + learned_questions scaffolding", s:"done"},
+      {t:"Cluster recurring skill gaps → add planner questions", s:"queued"},
+      {t:"Regenerate planner prompt from skills; prune dead skills", s:"queued"},
+    ]},
+];
+
+const CHIP = {done:"Done", prog:"In progress", queued:"Queued", blocked:"Blocked"};
+
+const root = document.getElementById("stages");
+STAGES.forEach(st=>{
+  const el = document.createElement("section");
+  el.className = "stage" + (st.future ? " future" : "");
+  el.style.setProperty("--ac", st.ac);
+  el.innerHTML = `
+    <div class="stage-head">
+      <div class="stage-num">${st.num}</div>
+      <div class="stage-titlewrap">
+        <div class="stage-title">${st.title}</div>
+        <div class="stage-sub">${st.sub}</div>
+      </div>
+      <div class="stage-pct">${st.pct}%<small>${st.future?"planned":"complete"}</small></div>
+    </div>
+    <div class="stage-body">
+      <div class="mbar"><div class="mfill" style="width:${st.pct}%"></div><div class="ticks"></div></div>
+      <ul class="tasks">
+        ${st.tasks.map(tk=>`
+          <a class="task" href="${st.link}">
+            <span class="chip ${tk.s}">${CHIP[tk.s]}</span>
+            <span class="lbl">${tk.t}</span>
+            <span class="arrow">→</span>
+          </a>`).join("")}
+      </ul>
+      <a class="speclink" href="${st.link}">Full spec →</a>
+    </div>`;
+  root.appendChild(el);
+});
+
+// overall = mean of stage percentages (excluding the "future" planned stage)
+const live = STAGES.filter(s=>!s.future);
+const overall = Math.round(live.reduce((a,s)=>a+s.pct,0)/live.length);
+document.getElementById("ovPct").textContent = overall + "%";
+document.getElementById("ovFill").style.width = overall + "%";
+</script>
+</body>
+</html>

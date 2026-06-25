@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Syndrax · Controlplane — Design Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg0:#07090F; --bg1:#0B0E17;
+    --glass:rgba(255,255,255,.045); --edge:rgba(255,255,255,.10); --blur:18px;
+    --txt:#F5F8FF; --dim:#9AA6BC; --mute:#5B6679;
+    --cyan:#22D3EE; --amber:#F5B544; --violet:#A78BFA; --emerald:#34D399; --rose:#FB7185; --blue:#60A5FA;
+    --blocked:#F0556B;
+    --display:'Space Grotesk',sans-serif; --body:'Inter',sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg0);color:var(--txt);font-family:var(--body);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+  canvas#bg{position:fixed;inset:0;z-index:0;display:block}
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:22px clamp(14px,3vw,30px) 80px}
+
+  .preview-tag{position:fixed;top:0;left:0;right:0;z-index:5;text-align:center;font-family:var(--mono);font-size:.66rem;letter-spacing:.22em;text-transform:uppercase;color:#0A0E16;background:linear-gradient(90deg,var(--cyan),var(--blue));padding:5px}
+
+  /* top bar */
+  .topbar{display:flex;align-items:center;gap:16px;margin-top:34px;padding:14px 18px;border-radius:16px;
+    background:var(--glass);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur));border:1px solid var(--edge)}
+  .brand{font-family:var(--display);font-weight:700;letter-spacing:-.01em;font-size:1.05rem}
+  .brand .bolt{color:var(--cyan)}
+  .nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:8px}
+  .nav button{font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;color:var(--dim);background:none;border:1px solid transparent;padding:7px 11px;border-radius:9px;cursor:pointer;transition:.15s}
+  .nav button:hover{color:var(--txt);border-color:var(--edge);background:rgba(255,255,255,.03)}
+  .nav button.on{color:#07090F;background:var(--cyan);font-weight:700}
+  .spacer{flex:1}
+  .profile-pill{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.72rem;color:var(--dim);border:1px solid var(--edge);padding:7px 11px;border-radius:20px}
+  .profile-pill .swatch{width:9px;height:9px;border-radius:50%;background:var(--violet);box-shadow:0 0 10px var(--violet)}
+  .sound-btn{background:none;border:1px solid var(--edge);color:var(--dim);width:36px;height:36px;border-radius:10px;cursor:pointer;font-size:.9rem}
+  .sound-btn:hover{color:var(--txt)}
+
+  h2.section{font-family:var(--display);font-weight:600;font-size:1.05rem;margin:30px 4px 12px;letter-spacing:-.01em}
+  h2.section span{color:var(--mute);font-family:var(--mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;margin-left:10px}
+
+  /* main grid */
+  .grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;margin-top:18px}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--glass);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur));border:1px solid var(--edge);border-radius:18px;overflow:hidden;position:relative}
+  .card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent)}
+  .card-h{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--edge);font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .led{width:8px;height:8px;border-radius:50%;background:var(--emerald);box-shadow:0 0 10px var(--emerald);animation:blink 2.4s infinite}
+
+  /* chat */
+  .chat{display:flex;flex-direction:column;height:520px}
+  .stream{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:16px}
+  .msg{max-width:92%}
+  .msg .who{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-bottom:6px;display:flex;gap:8px;align-items:center}
+  .badge{font-family:var(--mono);font-size:.58rem;padding:2px 6px;border-radius:5px;border:1px solid var(--edge);color:var(--cyan)}
+  .cost{color:var(--mute)}
+  .bubble{background:rgba(255,255,255,.04);border:1px solid var(--edge);border-radius:14px;padding:12px 14px;line-height:1.55}
+  .msg.me{align-self:flex-end}
+  .msg.me .bubble{background:rgba(96,165,250,.10);border-color:rgba(96,165,250,.3)}
+  /* code block */
+  .code{margin-top:10px;border:1px solid var(--edge);border-radius:11px;overflow:hidden;background:#070b13}
+  .code-h{display:flex;justify-content:space-between;align-items:center;padding:7px 11px;font-family:var(--mono);font-size:.62rem;color:var(--mute);border-bottom:1px solid var(--edge)}
+  .code-h .copy{cursor:pointer}
+  pre{font-family:var(--mono);font-size:.78rem;line-height:1.6;padding:12px;overflow:auto;margin:0}
+  .k{color:#C792EA}.s{color:#C3E88D}.f{color:#82AAFF}.c{color:#546E7A}.n{color:#F78C6C}.p{color:#89DDFF}
+  .composer{display:flex;gap:10px;padding:14px;border-top:1px solid var(--edge)}
+  .composer input{flex:1;background:rgba(255,255,255,.03);border:1px solid var(--edge);border-radius:11px;padding:11px 13px;color:var(--txt);font-family:var(--body)}
+  .composer input::placeholder{color:var(--mute)}
+  .send{background:var(--cyan);color:#07090F;border:none;border-radius:11px;padding:0 16px;font-weight:700;cursor:pointer}
+
+  /* plan console */
+  .plan{padding:18px}
+  .plan .est{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:.7rem;color:var(--dim);margin-bottom:16px}
+  .plan .est b{color:var(--txt)}
+  .flow{display:flex;flex-direction:column;gap:0;margin:4px 0 18px}
+  .node{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:11px;border:1px solid var(--edge);background:rgba(255,255,255,.025);position:relative}
+  .node .acc{width:10px;height:10px;border-radius:50%}
+  .node .nm{flex:1;font-size:.92rem}
+  .node .tag{font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+  .node.active{border-color:var(--violet);box-shadow:0 0 0 1px var(--violet),0 0 22px -6px var(--violet)}
+  .link{height:16px;width:1px;background:var(--edge);margin-left:18px}
+  .ctl{display:flex;gap:10px;margin-top:6px}
+  .ctl button{flex:1;font-family:var(--display);font-weight:600;font-size:.86rem;padding:11px;border-radius:11px;cursor:pointer;border:1px solid var(--edge);background:rgba(255,255,255,.03);color:var(--txt);transition:.15s}
+  .ctl .ok{background:var(--emerald);color:#07090F;border-color:transparent}
+  .ctl .ok:hover{filter:brightness(1.08)}
+  .ctl .mod:hover{border-color:var(--amber);color:var(--amber)}
+  .ctl .no:hover{border-color:var(--blocked);color:var(--blocked)}
+  .collab{display:flex;align-items:center;gap:9px;margin-top:14px;font-family:var(--mono);font-size:.68rem;color:var(--dim)}
+  .toggle{width:34px;height:19px;border-radius:20px;background:rgba(255,255,255,.1);border:1px solid var(--edge);position:relative;cursor:pointer;flex-shrink:0}
+  .toggle i{position:absolute;top:1.5px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--mute);transition:.2s}
+  .toggle.on{background:rgba(52,211,153,.3)}
+  .toggle.on i{left:16px;background:var(--emerald)}
+
+  /* repo cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:16px}
+  .repo{background:var(--glass);backdrop-filter:blur(var(--blur));border:1px solid var(--edge);border-radius:14px;padding:15px}
+  .repo .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .repo .nm{font-family:var(--display);font-weight:600}
+  .repo .plat{font-family:var(--mono);font-size:.6rem;padding:3px 7px;border-radius:5px;border:1px solid var(--edge);color:var(--dim)}
+  .repo .meta{font-family:var(--mono);font-size:.66rem;color:var(--mute);display:flex;gap:12px;margin-bottom:12px}
+  .repo .acts{display:flex;gap:8px}
+  .repo .acts button{flex:1;font-family:var(--mono);font-size:.64rem;padding:7px;border-radius:8px;border:1px solid var(--edge);background:none;color:var(--dim);cursor:pointer;transition:.15s}
+  .repo .acts .push:hover{border-color:var(--emerald);color:var(--emerald)}
+  .repo .acts .rm:hover{border-color:var(--blocked);color:var(--blocked)}
+
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="preview-tag">Design preview · non-functional · click the buttons for sound</div>
+<canvas id="bg"></canvas>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand"><span class="bolt">⚡</span> SYNDRAX · Controlplane</div>
+    <nav class="nav">
+      <button class="on">Cockpit</button>
+      <button>Profiles</button>
+      <button>Repos</button>
+      <button>Canvas</button>
+      <button>Benchmark</button>
+      <button>Architecture</button>
+    </nav>
+    <div class="spacer"></div>
+    <div class="profile-pill"><span class="swatch"></span> profile: refactor</div>
+    <button class="sound-btn" id="mute" title="Toggle sound">🔊</button>
+  </div>
+
+  <div class="grid">
+    <!-- CHAT -->
+    <div class="card chat">
+      <div class="card-h"><span class="led"></span> Cockpit · live session</div>
+      <div class="stream">
+        <div class="msg me"><div class="who">you</div><div class="bubble">Split the monolithic handler into modules and keep tests green.</div></div>
+        <div class="msg">
+          <div class="who">orchestrator <span class="badge">GLM-5.2 · planner</span> <span class="cost">· $0.004</span></div>
+          <div class="bubble">Scored this <b>7/10</b> — multi-file refactor with circular-import risk. Proposed plan is on the right. Confirm to run.
+            <div class="code">
+              <div class="code-h"><span>plan.json</span><span class="copy">copy</span></div>
+<pre><span class="k">const</span> <span class="f">plan</span> = {
+  <span class="p">complexity</span>: <span class="n">7</span>,
+  <span class="p">route</span>: [<span class="s">"sonnet-4.6"</span>, <span class="s">"verifier"</span>],
+  <span class="p">gates</span>: [<span class="s">"D"</span>, <span class="s">"G"</span>, <span class="s">"H"</span>], <span class="c">// lint, collab, human</span>
+};</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="composer">
+        <input placeholder="Message the orchestrator…">
+        <button class="send" data-sound="click">Send</button>
+      </div>
+    </div>
+
+    <!-- PLAN CONSOLE -->
+    <div class="card">
+      <div class="card-h"><span class="led" style="background:var(--violet);box-shadow:0 0 10px var(--violet)"></span> Plan Console · confirm before run</div>
+      <div class="plan">
+        <div class="est"><span>complexity <b>7/10</b></span><span>est. cost <b>~$0.21</b></span><span>est. time <b>~24s</b></span></div>
+        <div class="flow">
+          <div class="node"><span class="acc" style="background:var(--cyan)"></span><span class="nm">Planner</span><span class="tag">GLM-5.2 ✓</span></div>
+          <div class="link"></div>
+          <div class="node active"><span class="acc" style="background:var(--violet)"></span><span class="nm">Executor · medium</span><span class="tag">Sonnet 4.6</span></div>
+          <div class="link"></div>
+          <div class="node"><span class="acc" style="background:var(--amber)"></span><span class="nm">Gate G · collab if stuck</span><span class="tag">GPT-5.4</span></div>
+          <div class="link"></div>
+          <div class="node"><span class="acc" style="background:var(--emerald)"></span><span class="nm">Verifier</span><span class="tag">DeepSeek V3</span></div>
+          <div class="link"></div>
+          <div class="node"><span class="acc" style="background:var(--blue)"></span><span class="nm">Gate H · human review</span><span class="tag">you</span></div>
+        </div>
+        <div class="ctl">
+          <button class="ok" data-sound="approve">Confirm &amp; run</button>
+          <button class="mod" data-sound="click">Modify</button>
+          <button class="no" data-sound="cancel">Cancel</button>
+        </div>
+        <div class="collab">
+          <span class="toggle" id="collabT" data-sound="click"><i></i></span>
+          Pull a smarter model to pressure-test the plan
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section">Connections <span>repos &amp; platforms</span></h2>
+  <div class="cards">
+    <div class="repo"><div class="top"><span class="nm">syndrax-sync</span><span class="plat">GitHub</span></div><div class="meta"><span>main</span><span>● synced</span></div><div class="acts"><button class="push" data-sound="approve">Push</button><button class="rm" data-sound="blocked">Remove</button></div></div>
+    <div class="repo"><div class="top"><span class="nm">hermes-orchestration</span><span class="plat">GitHub</span></div><div class="meta"><span>main</span><span>● ready</span></div><div class="acts"><button class="push" data-sound="approve">Push</button><button class="rm" data-sound="blocked">Remove</button></div></div>
+    <div class="repo"><div class="top"><span class="nm">syndrax.app</span><span class="plat">Vercel</span></div><div class="meta"><span>prod</span><span>● live</span></div><div class="acts"><button class="push" data-sound="approve">Deploy</button><button class="rm" data-sound="blocked">Remove</button></div></div>
+    <div class="repo" style="border-style:dashed;display:flex;align-items:center;justify-content:center;color:var(--mute);font-family:var(--mono);font-size:.8rem;cursor:pointer" data-sound="click">+ connect repo / platform</div>
+  </div>
+</div>
+
+<script>
+/* ---------- hexagon field + drifting shapes ---------- */
+const cv=document.getElementById('bg'),ctx=cv.getContext('2d');
+let W,H,shapes=[],reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+function size(){W=cv.width=innerWidth;H=cv.height=innerHeight;}
+size();addEventListener('resize',size);
+for(let i=0;i<16;i++)shapes.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,s:2+Math.random()*4,v:.15+Math.random()*.35,r:Math.random()*6,tri:Math.random()>.5});
+const R=34, dx=R*1.5, dy=R*Math.sqrt(3);
+function hex(cx,cy){ctx.beginPath();for(let i=0;i<6;i++){const a=Math.PI/180*(60*i);const x=cx+R*Math.cos(a),y=cy+R*Math.sin(a);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();ctx.stroke();}
+let t=0;
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // radial depth
+  const g=ctx.createRadialGradient(W*.8,-80,0,W*.8,-80,Math.max(W,H));
+  g.addColorStop(0,'#101a2e');g.addColorStop(.6,'#07090F');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // hex grid drifting
+  ctx.strokeStyle='rgba(255,255,255,0.05)';ctx.lineWidth=1;
+  const off=reduce?0:(t*0.15)% (dy);
+  for(let cx=-R;cx<W+R;cx+=dx){let i=Math.round(cx/dx);for(let cy=-R-off;cy<H+R;cy+=dy){hex(cx,(i%2?cy+dy/2:cy));}}
+  // floating white shapes
+  shapes.forEach(p=>{
+    if(!reduce){p.y-=p.v;p.r+=0.003;if(p.y<-10){p.y=H+10;p.x=Math.random()*W;}}
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle='rgba(255,255,255,0.06)';
+    if(p.tri){ctx.beginPath();ctx.moveTo(0,-p.s);ctx.lineTo(p.s,p.s);ctx.lineTo(-p.s,p.s);ctx.closePath();ctx.fill();}
+    else{ctx.beginPath();ctx.arc(0,0,p.s*.6,0,7);ctx.fill();}
+    ctx.restore();
+  });
+  t++;requestAnimationFrame(draw);
+}
+draw();
+
+/* ---------- sound design (Web Audio, no files) ---------- */
+let AC,muted=false;
+function ac(){if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC;}
+function tone(freqs,dur,type='sine',vol=0.06){
+  if(muted)return;const c=ac();const now=c.currentTime;
+  freqs.forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.value=f;
+    const st=now+i*0.07;o.connect(g);g.connect(c.destination);
+    g.gain.setValueAtTime(0,st);g.gain.linearRampToValueAtTime(vol,st+0.012);g.gain.exponentialRampToValueAtTime(0.0001,st+dur);
+    o.start(st);o.stop(st+dur+0.02);});
+}
+const SOUND={
+  click:()=>tone([520],0.09,'triangle',0.04),
+  approve:()=>tone([523,784],0.18,'sine',0.06),
+  cancel:()=>tone([392,294],0.16,'sine',0.05),
+  blocked:()=>tone([110,98],0.22,'sawtooth',0.05),
+  result:()=>tone([659,988],0.2,'sine',0.06),
+};
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-sound]');if(el){(SOUND[el.dataset.sound]||SOUND.click)();}
+});
+// nav + collab toggle interactions
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('on'));b.classList.add('on');SOUND.click();
+}));
+const ct=document.getElementById('collabT');ct.addEventListener('click',()=>ct.classList.toggle('on'));
+document.getElementById('mute').addEventListener('click',function(){muted=!muted;this.textContent=muted?'🔇':'🔊';if(!muted)SOUND.result();});
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+# ============================================================================
+#  SECRETS — never commit these
+# ============================================================================
+.env
+.env.*
+!.env.template
+*.key
+*.pem
+secrets/
+*-secret.json
+*credentials*
+
+# LiteLLM local state
+litellm_logs/
+*.db
+
+# Benchmark output (local run data; keep the repo clean)
+benchmark_logs/
+*.jsonl
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node / dashboard build (when the controlplane lands)
+node_modules/
+dist/
+build/
+.next/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Runtime logs
+mcp-server.log
+*.log

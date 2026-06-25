@@ -1,0 +1,88 @@
+# ============================================================================
+#  LiteLLM proxy config — Hermes orchestration
+# ----------------------------------------------------------------------------
+#  Role: ONE endpoint, many providers. A DUMB PIPE. LiteLLM's own routing /
+#  load-balancing / retries are intentionally OFF — the orchestration Gates
+#  (planner complexity score, micro-orchestrator escalation) make the routing
+#  decisions, not LiteLLM. See architecture-schema.json -> providers.
+#
+#  Keys are read from the environment (your .env / AWS Secrets Manager). No raw
+#  key values appear here. Start the proxy with:
+#     litellm --config litellm-config.yaml
+# ============================================================================
+
+model_list:
+  # ---- Anthropic (direct) ----
+  - model_name: claude-opus-4-8
+    litellm_params:
+      model: anthropic/claude-opus-4-8
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: claude-haiku-4-5
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # ---- DeepSeek (direct) ----
+  - model_name: deepseek-v3
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+  - model_name: deepseek-v4-flash
+    litellm_params:
+      model: deepseek/deepseek-v4-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+  - model_name: deepseek-v4-pro
+    litellm_params:
+      model: deepseek/deepseek-v4-pro
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  # ---- Z.ai GLM (direct) — planner ----
+  - model_name: glm-5.2
+    litellm_params:
+      model: openai/glm-5.2          # Z.ai exposes an OpenAI-compatible endpoint
+      api_base: https://api.z.ai/v1  # confirm current base URL in Z.ai docs
+      api_key: os.environ/ZAI_API_KEY
+
+  # ---- OpenAI (direct) ----
+  - model_name: gpt-5.4
+    litellm_params:
+      model: openai/gpt-5.4
+      api_key: os.environ/OPENAI_API_KEY
+
+  # ---- Google Gemini (direct) ----
+  - model_name: gemini-3-flash
+    litellm_params:
+      model: gemini/gemini-3-flash
+      api_key: os.environ/GOOGLE_API_KEY
+  - model_name: gemini-3.1-flash-lite
+    litellm_params:
+      model: gemini/gemini-3.1-flash-lite
+      api_key: os.environ/GOOGLE_API_KEY
+
+  # ---- OpenRouter (FAILOVER + testing) ----
+  # Catch-all. Any model can be reached via "openrouter/<slug>" when its direct
+  # key is unset or the direct call fails. Also your single key for testing
+  # models you don't have direct access to yet.
+  - model_name: openrouter-any
+    litellm_params:
+      model: openrouter/auto
+      api_key: os.environ/OPENROUTER_API_KEY
+
+# ---- Proxy-level settings ----
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY   # Hermes authenticates to the proxy with this
+
+litellm_settings:
+  # Cost tracking is on (feeds Gate E / OVERSPEND_TRIGGER in self-tuning-logic.py).
+  # Per-key budgets can be set here when you want hard caps.
+  drop_params: true
+  set_verbose: false
+
+# ---- IMPORTANT: keep LiteLLM's own orchestration OFF ----
+# Do NOT configure `router_settings` fallbacks/retries/load-balancing here.
+# Routing and escalation are owned by the Hermes Gates, not the proxy. If you add
+# LiteLLM fallbacks they will fight the Gate logic and double-route requests.

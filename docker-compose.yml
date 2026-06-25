@@ -1,0 +1,42 @@
+# Local dev stack — bring up the MCP server (and optionally LiteLLM) to test
+# before deploying to syndrax.app. Keys come from your local .env (gitignored).
+#
+#   docker compose up
+#
+services:
+  mcp:
+    build: .
+    container_name: syndrax-mcp
+    env_file: .env
+    environment:
+      SYNDRAX_ENV: dev
+      TRANSPORT: sse
+      SYNDRAX_API_ENDPOINT: http://backend:8000   # point at your orchestration backend
+      LOG_LEVEL: DEBUG
+    ports:
+      - "3000:3000"
+    # modest caps so local testing can't run away
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    restart: unless-stopped
+
+  # OPTIONAL: self-hosted LiteLLM proxy (the model call layer).
+  # Uncomment to run it alongside. Config in litellm-config.yaml.
+  # litellm:
+  #   image: ghcr.io/berriai/litellm:main-latest
+  #   container_name: syndrax-litellm
+  #   env_file: .env
+  #   command: ["--config", "/app/litellm-config.yaml"]
+  #   volumes:
+  #     - ./litellm-config.yaml:/app/litellm-config.yaml:ro
+  #   ports:
+  #     - "4000:4000"
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: "1.0"
+  #         memory: 512M
+  #   restart: unless-stopped
